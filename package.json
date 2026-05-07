@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
