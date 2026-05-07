@@ -1,0 +1,40 @@
+[     104ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:20102
+[  156772ms] [ERROR] The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [aureus-brochure, /assets/AUREUS%20BROCHURE.pdf, (pageCount) => {
+    setBooks(
+      (current) => current.map((book) => book.id === selectedBookId && book.pageCount !== pageCount ? { ...book, pageCount } : book)
+    );
+  }] [, aureus-brochure, false, (pageCount) => {
+    setBooks(
+      (current) => current.map((book) => book.id === selectedBookId && book.pageCount !== pageCount ? { ...book, pageCount } : book)
+    );
+  }] @ http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:5627
+[  191045ms] [ERROR] The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [, 0] [false, , 0] @ http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:5627
+[ 1299678ms] ReferenceError: setPdfDoc is not defined
+    at loadBook (http://localhost:4174/src/components/FlipbookViewer.tsx?t=1778163201424:469:9)
+    at http://localhost:4174/src/components/FlipbookViewer.tsx?t=1778163201424:503:10
+    at Object.react_stack_bottom_frame (http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:18567:20)
+    at runWithFiberInDEV (http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:997:72)
+    at commitHookEffectListMount (http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:9411:163)
+    at commitHookPassiveMountEffects (http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:9465:60)
+    at commitPassiveMountOnFiber (http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:11040:29)
+    at recursivelyTraversePassiveMountEffects (http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:11010:13)
+    at commitPassiveMountOnFiber (http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:11201:13)
+    at recursivelyTraversePassiveMountEffects (http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:11010:13)
+[ 1320465ms] [ERROR] The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [, aureus-brochure, false, (pageCount) => {
+    setBooks(
+      (current) => current.map((book) => book.id === selectedBookId && book.pageCount !== pageCount ? { ...book, pageCount } : book)
+    );
+  }] [aureus-brochure, false, false, , (pageCount) => {
+    setBooks(
+      (current) => current.map((book) => book.id === selectedBookId && book.pageCount !== pageCount ? { ...book, pageCount } : book)
+    );
+  }, ] @ http://localhost:4174/node_modules/.vite/deps/react-dom_client.js?v=ecf6658f:5627
