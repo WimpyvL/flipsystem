@@ -4,7 +4,6 @@ import { formatBytes, getContentKind, getContentLabel, normalizeTitle } from "./
 import { assetBooks } from "./data/assetBooks";
 import { getDocument } from "./pdf";
 import { FlipbookViewer } from "./components/FlipbookViewer";
-import { MagazineEditor } from "./components/MagazineEditor";
 import type { ContentPage, FlipbookItem } from "./types";
 
 const makeUploadId = () => {
@@ -468,24 +467,17 @@ export default function App() {
               editor={
                 isEditing && draftBook
                   ? {
+                      book: draftBook,
                       selectedPageId: editorPageId,
                       onSelectPage: setEditorPageId,
-                      onUpdatePage: handleDraftPageUpdate
+                      onChange: handleDraftBookChange,
+                      onUpdatePage: handleDraftPageUpdate,
+                      onSave: () => handleUpdateBook(draftBook),
+                      onClose: handleCancelEditing
                     }
                   : undefined
               }
             />
-            {isEditing && draftBook ? (
-              <MagazineEditor
-                key={draftBook.id}
-                book={draftBook}
-                selectedPageId={editorPageId}
-                onSelectPage={setEditorPageId}
-                onChange={handleDraftBookChange}
-                onSave={() => handleUpdateBook(draftBook)}
-                onClose={handleCancelEditing}
-              />
-            ) : null}
           </div>
         </div>
       )}

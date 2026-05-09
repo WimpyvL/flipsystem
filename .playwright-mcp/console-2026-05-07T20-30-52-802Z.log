@@ -1,6 +1,0 @@
-[     499ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:4173/node_modules/.vite/deps/react-dom_client.js?v=a7280e2d:20102
-[  131200ms] [LOG] [vite] server connection lost. Polling for restart... @ http://127.0.0.1:4173/@vite/client:864
-[ 2737543ms] [WARNING] Warning: Setting up fake worker. @ http://127.0.0.1:4173/node_modules/.vite/deps/pdfjs-dist.js?v=a7280e2d:261
-[ 2739314ms] [ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:4173/node_modules/pdfjs-dist/build/pdf.worker.min.mjs?import:0
-[ 2739315ms] [ERROR] Failed to load flipbook Error: Setting up fake worker failed: "Failed to fetch dynamically imported module: http://127.0.0.1:4173/node_modules/pdfjs-dist/build/pdf.worker.min.mjs?import".
-    at http://127.0.0.1:4173/node_modules/.vite/deps/pdfjs-dist.js?v=a7280e2d:15310:44 @ http://127.0.0.1:4173/src/components/FlipbookViewer.tsx:534

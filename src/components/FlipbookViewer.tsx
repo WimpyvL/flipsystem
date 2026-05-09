@@ -345,9 +345,13 @@ type FlipbookViewerProps = {
   onLoaded?: (pageCount: number) => void;
   variant?: "dashboard" | "presentation";
   editor?: {
+    book: FlipbookItem;
     selectedPageId: string;
     onSelectPage: (pageId: string) => void;
+    onChange: (updatedBook: FlipbookItem) => void;
     onUpdatePage: (pageId: string, updater: (page: ContentPage) => ContentPage) => void;
+    onSave: () => void;
+    onClose: () => void;
   };
 };
 
@@ -646,28 +650,17 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
 
       {!isFlipbook && !error ? <NativeContentPreview book={book} /> : null}
 
-      {editor && isMagazine && selectedEditorPage && selectedEditorPage.contentKind !== "pdf" ? (
+      {editor && isMagazine && selectedEditorPage ? (
         <div className="flipbook-shell editor-preview-shell">
-          <PageDesignEditor page={selectedEditorPage} onUpdatePage={editor.onUpdatePage} />
-          <div className="page-jump-list" aria-label="Magazine pages">
-            {magazinePages.map((page, index) => (
-              <button
-                key={`editor-jump-${page.id}`}
-                type="button"
-                className={`page-jump ${editor.selectedPageId === page.id ? "active" : ""}`}
-                onClick={() => editor.onSelectPage(page.id)}
-              >
-                <span>Page {index + 1}</span>
-                <small>{getContentLabel(page.contentKind)}</small>
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {editor && isMagazine && selectedEditorPage?.contentKind === "pdf" ? (
-        <div className="viewer-message editor-viewer-note">
-          <span>PDF pages keep their document layout. Choose a non-PDF page to place draggable blocks and linked overlays.</span>
+          <PageDesignEditor
+            book={editor.book}
+            selectedPageId={editor.selectedPageId}
+            onSelectPage={editor.onSelectPage}
+            onChange={editor.onChange}
+            onUpdatePage={editor.onUpdatePage}
+            onSave={editor.onSave}
+            onClose={editor.onClose}
+          />
         </div>
       ) : null}
 
