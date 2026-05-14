@@ -36,8 +36,54 @@ const clonePage = (page: ContentPage) => {
   return JSON.parse(JSON.stringify(page)) as ContentPage;
 };
 
+const STORAGE_KEY = "flipsystem:books";
+
+const isBlobUrl = (url: string | undefined): boolean =>
+  typeof url === "string" && url.startsWith("blob:");
+
+const prepareBooksForStorage = (books: FlipbookItem[]): FlipbookItem[] =>
+  books
+    .filter((book) => {
+      // Uploaded books rely on blob: URLs that are destroyed when the tab closes; skip them.
+      if (book.source === "upload") return false;
+      return true;
+    })
+    .map((book) => ({
+      ...book,
+      // Strip a custom cover that came from a blob: URL (e.g. an uploaded cover image).
+      coverImageUrl: isBlobUrl(book.coverImageUrl) ? undefined : book.coverImageUrl,
+      // Strip pages whose content is a blob: URL (undefined pages are preserved as-is).
+      pages: book.pages?.filter((page) => !isBlobUrl(page.contentUrl))
+    }));
+
+const loadBooksFromStorage = (): FlipbookItem[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return assetBooks;
+
+    const stored: FlipbookItem[] = JSON.parse(raw);
+    const storedById = new Map(stored.map((book) => [book.id, book]));
+
+    // Apply stored modifications to the fresh asset books so new assets still appear.
+    const merged = assetBooks.map((book) => storedById.get(book.id) ?? book);
+
+    // Re-append any non-asset books from storage that are not already present.
+    const assetIds = new Set(assetBooks.map((b) => b.id));
+    for (const book of stored) {
+      if (!assetIds.has(book.id)) {
+        merged.push(book);
+      }
+    }
+
+    return merged;
+  } catch {
+    return assetBooks;
+  }
+};
+
 export default function App() {
-  const [books, setBooks] = useState<FlipbookItem[]>(assetBooks);
+  const [books, setBooks] = useState<FlipbookItem[]>(loadBooksFromStorage);
+  // selectedBookId defaults to the first asset book; the books list always starts with asset books.
   const [selectedBookId, setSelectedBookId] = useState<string>(assetBooks[0]?.id ?? "");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -378,6 +424,14 @@ export default function App() {
   useEffect(() => {
     isEditingRef.current = isEditing;
   }, [isEditing]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(prepareBooksForStorage(books)));
+    } catch {
+      // Ignore storage errors (e.g. private-browsing quota exceeded).
+    }
+  }, [books]);
 
   useEffect(() => {
     const onPopState = () => setRoutePath(window.location.pathname);
