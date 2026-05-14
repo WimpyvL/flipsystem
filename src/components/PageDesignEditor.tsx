@@ -32,6 +32,7 @@ type PageDesignEditorProps = {
   onUpdatePage: (pageId: string, updater: (page: ContentPage) => ContentPage) => void;
   catalogPages: ContentPage[];
   onAddCatalogPage: (page: ContentPage) => void;
+  onCoverUpload: (file: File) => void;
   onSave: () => void;
   onClose: () => void;
 };
@@ -114,6 +115,7 @@ export function PageDesignEditor({
   onUpdatePage,
   catalogPages,
   onAddCatalogPage,
+  onCoverUpload,
   onSave,
   onClose
 }: PageDesignEditorProps) {
@@ -219,7 +221,7 @@ export function PageDesignEditor({
       return;
     }
 
-    updateBook({ coverImageUrl: URL.createObjectURL(file) });
+    onCoverUpload(file);
   };
 
   const patchSelectedBlock = (patch: Partial<ContentBlock>) => {

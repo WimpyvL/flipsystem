@@ -47,6 +47,8 @@ export default function App() {
   const [recentlyAddedPageId, setRecentlyAddedPageId] = useState<string | null>(null);
   const [routePath, setRoutePath] = useState(() => window.location.pathname);
   const uploadUrlsRef = useRef<Map<string, string>>(new Map());
+  const draftUploadUrlsRef = useRef<Map<string, string>>(new Map());
+  const isEditingRef = useRef(false);
 
   const selectedBook = useMemo(
     () => books.find((book) => book.id === selectedBookId) ?? null,
@@ -95,6 +97,29 @@ export default function App() {
     uploadUrlsRef.current.delete(entityId);
   }, []);
 
+  const revokeDraftUploadUrl = useCallback((entityId: string) => {
+    const uploadUrl = draftUploadUrlsRef.current.get(entityId);
+    if (!uploadUrl) {
+      return;
+    }
+
+    URL.revokeObjectURL(uploadUrl);
+    draftUploadUrlsRef.current.delete(entityId);
+  }, []);
+
+  const clearDraftUploadUrls = useCallback(() => {
+    for (const uploadUrl of draftUploadUrlsRef.current.values()) {
+      URL.revokeObjectURL(uploadUrl);
+    }
+    draftUploadUrlsRef.current.clear();
+  }, []);
+
+  const clearDraftUploadUrlsAfterRender = useCallback(() => {
+    window.setTimeout(clearDraftUploadUrls, 0);
+  }, [clearDraftUploadUrls]);
+
+  const getDraftCoverKey = useCallback((bookId: string) => `cover:${bookId}`, []);
+
   const handleFileUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -118,11 +143,13 @@ export default function App() {
         await documentProxy.destroy();
       }
 
-      if (selectedBook?.contentKind === "magazine") {
+      const activeMagazineBook = isEditing && draftBook?.id === selectedBook?.id ? draftBook : selectedBook;
+
+      if (activeMagazineBook?.contentKind === "magazine") {
         const nextPage: ContentPage = {
           id: makeUploadId(),
           title: normalizeTitle(file.name),
-          description: createUploadDescription(contentKind, "page", selectedBook.title),
+          description: createUploadDescription(contentKind, "page", activeMagazineBook.title),
           contentUrl: fileUrl,
           contentKind,
           fileName: file.name,
@@ -130,21 +157,36 @@ export default function App() {
           sizeBytes: file.size
         };
 
-        uploadUrlsRef.current.set(nextPage.id, fileUrl);
-        setBooks((current) =>
-          current.map((book) =>
-            book.id === selectedBook.id
+        if (isEditing && draftBook?.id === activeMagazineBook.id) {
+          draftUploadUrlsRef.current.set(nextPage.id, fileUrl);
+          setDraftBook((current) =>
+            current && current.id === activeMagazineBook.id
               ? {
-                  ...book,
-                  pages: [...(book.pages ?? []), nextPage],
-                  pageCount: (book.pageCount || 0) + (contentKind === "pdf" ? pageCount : 1),
-                  sizeBytes: (book.sizeBytes ?? 0) + file.size
+                  ...current,
+                  pages: [...(current.pages ?? []), nextPage],
+                  pageCount: (current.pageCount || 0) + (contentKind === "pdf" ? pageCount : 1),
+                  sizeBytes: (current.sizeBytes ?? 0) + file.size
                 }
-              : book
-          )
-        );
+              : current
+          );
+        } else {
+          uploadUrlsRef.current.set(nextPage.id, fileUrl);
+          setBooks((current) =>
+            current.map((book) =>
+              book.id === activeMagazineBook.id
+                ? {
+                    ...book,
+                    pages: [...(book.pages ?? []), nextPage],
+                    pageCount: (book.pageCount || 0) + (contentKind === "pdf" ? pageCount : 1),
+                    sizeBytes: (book.sizeBytes ?? 0) + file.size
+                  }
+                : book
+            )
+          );
+        }
+
         setDraftBook((current) =>
-          current && current.id === selectedBook.id
+          current && current.id === activeMagazineBook.id && !isEditing
             ? {
                 ...current,
                 pages: [...(current.pages ?? []), nextPage],
@@ -153,7 +195,7 @@ export default function App() {
               }
             : current
         );
-        setSelectedBookId(selectedBook.id);
+        setSelectedBookId(activeMagazineBook.id);
         setEditorPageId(nextPage.id);
         setRecentlyAddedPageId(nextPage.id);
         return;
@@ -183,23 +225,34 @@ export default function App() {
     } finally {
       setIsUploading(false);
     }
-  }, [selectedBook]);
+  }, [draftBook, isEditing, selectedBook]);
 
   const handleRemoveBook = useCallback((bookId: string) => {
     revokeUploadUrl(bookId);
+    revokeUploadUrl(getDraftCoverKey(bookId));
     setBooks((current) => {
+      const removedBook = current.find((book) => book.id === bookId);
+      for (const page of removedBook?.pages ?? []) {
+        revokeUploadUrl(page.id);
+      }
+
       const remaining = current.filter((book) => book.id !== bookId);
       setSelectedBookId((currentSelected) => (currentSelected === bookId ? remaining[0]?.id ?? "" : currentSelected));
       return remaining;
     });
     setDraftBook((current) => (current?.id === bookId ? null : current));
     if (selectedBookId === bookId) {
+      isEditingRef.current = false;
       setIsEditing(false);
       setEditorPageId("");
     }
-  }, [revokeUploadUrl, selectedBookId]);
+  }, [getDraftCoverKey, revokeUploadUrl, selectedBookId]);
 
   const handleViewerLoaded = useCallback((pageCount: number) => {
+    if (isEditingRef.current) {
+      return;
+    }
+
     const activeBookId = presentationBookId || selectedBookId;
     setBooks((current) =>
       current.map((book) => (book.id === activeBookId && book.pageCount !== pageCount ? { ...book, pageCount } : book))
@@ -207,6 +260,27 @@ export default function App() {
   }, [presentationBookId, selectedBookId]);
 
   const handleUpdateBook = useCallback((updatedBook: FlipbookItem) => {
+    const committedCoverKey = getDraftCoverKey(updatedBook.id);
+    const previousCommittedCoverUrl = uploadUrlsRef.current.get(committedCoverKey);
+    if (previousCommittedCoverUrl && previousCommittedCoverUrl !== updatedBook.coverImageUrl) {
+      URL.revokeObjectURL(previousCommittedCoverUrl);
+      uploadUrlsRef.current.delete(committedCoverKey);
+    }
+
+    const draftCoverUrl = draftUploadUrlsRef.current.get(committedCoverKey);
+    if (draftCoverUrl && draftCoverUrl === updatedBook.coverImageUrl) {
+      uploadUrlsRef.current.set(committedCoverKey, draftCoverUrl);
+      draftUploadUrlsRef.current.delete(committedCoverKey);
+    }
+
+    for (const page of updatedBook.pages ?? []) {
+      const draftPageUrl = draftUploadUrlsRef.current.get(page.id);
+      if (draftPageUrl && draftPageUrl === page.contentUrl) {
+        uploadUrlsRef.current.set(page.id, draftPageUrl);
+        draftUploadUrlsRef.current.delete(page.id);
+      }
+    }
+
     setBooks((current) =>
       current.map((book) => {
         if (book.id !== updatedBook.id) {
@@ -224,28 +298,34 @@ export default function App() {
       })
     );
     setDraftBook(null);
+    isEditingRef.current = false;
     setIsEditing(false);
     setEditorPageId("");
     setRecentlyAddedPageId(null);
-  }, [revokeUploadUrl]);
+    clearDraftUploadUrlsAfterRender();
+  }, [clearDraftUploadUrlsAfterRender, getDraftCoverKey, revokeUploadUrl]);
 
   const handleStartEditing = useCallback(() => {
     if (!selectedBook) {
       return;
     }
 
+    clearDraftUploadUrls();
     const nextDraft = cloneBook(selectedBook);
     setDraftBook(nextDraft);
     setEditorPageId(nextDraft.pages?.[0]?.id ?? "");
+    isEditingRef.current = true;
     setIsEditing(true);
-  }, [selectedBook]);
+  }, [clearDraftUploadUrls, selectedBook]);
 
   const handleCancelEditing = useCallback(() => {
     setDraftBook(null);
     setEditorPageId("");
+    isEditingRef.current = false;
     setIsEditing(false);
     setRecentlyAddedPageId(null);
-  }, []);
+    clearDraftUploadUrlsAfterRender();
+  }, [clearDraftUploadUrlsAfterRender]);
 
   const handleDraftBookChange = useCallback((updatedBook: FlipbookItem) => {
     setDraftBook(updatedBook);
@@ -283,6 +363,22 @@ export default function App() {
     setRecentlyAddedPageId(catalogPage.id);
   }, []);
 
+  const handleDraftCoverUpload = useCallback((file: File) => {
+    if (!draftBook || !file.type.startsWith("image/")) {
+      return;
+    }
+
+    const coverKey = getDraftCoverKey(draftBook.id);
+    revokeDraftUploadUrl(coverKey);
+    const coverUrl = URL.createObjectURL(file);
+    draftUploadUrlsRef.current.set(coverKey, coverUrl);
+    setDraftBook((current) => (current ? { ...current, coverImageUrl: coverUrl } : current));
+  }, [draftBook, getDraftCoverKey, revokeDraftUploadUrl]);
+
+  useEffect(() => {
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
+
   useEffect(() => {
     const onPopState = () => setRoutePath(window.location.pathname);
     window.addEventListener("popstate", onPopState);
@@ -295,6 +391,10 @@ export default function App() {
         URL.revokeObjectURL(uploadUrl);
       }
       uploadUrlsRef.current.clear();
+      for (const uploadUrl of draftUploadUrlsRef.current.values()) {
+        URL.revokeObjectURL(uploadUrl);
+      }
+      draftUploadUrlsRef.current.clear();
     };
   }, []);
 
@@ -505,6 +605,7 @@ export default function App() {
                       onUpdatePage: handleDraftPageUpdate,
                       catalogPages: vimeoProfileVideos,
                       onAddCatalogPage: handleAddCatalogPage,
+                      onCoverUpload: handleDraftCoverUpload,
                       onSave: () => handleUpdateBook(draftBook),
                       onClose: handleCancelEditing
                     }

@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#fbf6ef" />
+<title>Leny</title>
+<style>
+  :root{
+    --leny-orange:#c8501b;
+    --leny-cream:#fbf6ef;
+    --leny-cream-2:#f3eadb;
+    --ink:#1c1c1c;
+    --muted:#6b6b6b;
+    --line:#e7dfd1;
+    --good:#22a06b;
+    --bad:#e3553b;
+    --safe-top:env(safe-area-inset-top, 0px);
+    --safe-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;background:var(--leny-cream);font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",sans-serif;color:var(--ink);overflow:hidden;}
+  body{overscroll-behavior:none;}
+  img{display:block;}
+
+  .app{position:fixed;inset:0;display:flex;flex-direction:column;padding-top:var(--safe-top);padding-bottom:var(--safe-bottom);}
+
+  /* ---------- Top bar ---------- */
+  .topbar{display:flex;justify-content:space-between;align-items:center;padding:12px 16px 10px;background:var(--leny-cream);}
+  .logo{color:var(--leny-orange);font-weight:700;font-size:26px;font-family:Georgia,"Times New Roman",serif;line-height:1;}
+  .topicons{display:flex;gap:14px;align-items:center;}
+  .iconbtn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:10px;}
+  .iconbtn:active{background:var(--leny-cream-2);}
+
+  /* ---------- Screen container ---------- */
+  .screens{flex:1;position:relative;overflow:hidden;}
+  .screen{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;display:none;}
+  .screen.active{display:block;}
+  .screen-inner{padding:0 16px 80px;}
+
+  /* ---------- Specialty rail ---------- */
+  .rail-head{font-weight:700;font-size:14px;margin:8px 4px 8px;display:flex;justify-content:space-between;align-items:center;}
+  .rail-head a{font-size:12px;color:var(--leny-orange);text-decoration:none;}
+  .rail{display:flex;gap:14px;overflow-x:auto;padding:2px 2px 14px;scroll-snap-type:x mandatory;}
+  .rail::-webkit-scrollbar{display:none;}
+  .rail{scrollbar-width:none;-ms-overflow-style:none;}
+  .agent{flex:0 0 68px;text-align:center;scroll-snap-align:start;cursor:pointer;}
+  .agent .ring{width:66px;height:66px;border-radius:50%;padding:3px;position:relative;transition:transform .15s ease;}
+  .agent:active .ring{transform:scale(.94);}
+  .ring.g1{background:linear-gradient(135deg,#c8501b,#f3b138);}
+  .ring.g2{background:linear-gradient(135deg,#2c89c8,#7cc7f0);}
+  .ring.g3{background:linear-gradient(135deg,#22a06b,#9fd9b5);}
+  .ring.g4{background:linear-gradient(135deg,#7d57c1,#c8a7f0);}
+  .ring.g5{background:linear-gradient(135deg,#d23b6f,#f3a3c0);}
+  .ring.g6{background:linear-gradient(135deg,#e6a23c,#f3d49a);}
+  .ring.g7{background:linear-gradient(135deg,#444,#888);}
+  .ring.add{background:linear-gradient(135deg,#cfcfcf,#efefef);}
+  .agent .inner{width:100%;height:100%;border-radius:50%;background:#fff;overflow:hidden;display:flex;align-items:center;justify-content:center;}
+  .agent .inner img{width:100%;height:100%;object-fit:cover;}
+  .agent .inner.plus{font-size:26px;color:#666;}
+  .agent .name{font-size:11.5px;margin-top:7px;color:#333;line-height:1.15;}
+  .ring.live::after{content:"";position:absolute;top:2px;right:2px;width:14px;height:14px;border-radius:50%;background:var(--good);border:2.5px solid #fff;}
+
+  /* ---------- Chats heading ---------- */
+  .chats-title{font-weight:700;font-size:18px;margin:10px 4px 8px;}
+
+  /* ---------- Conversation row ---------- */
+  .conv{display:flex;gap:12px;align-items:center;padding:14px 6px;border-bottom:1px solid #efe5d3;cursor:pointer;transition:background .12s ease;}
+  .conv:active{background:#f4ecdc;}
+  .conv .avatar{width:48px;height:48px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#eee;}
+  .conv .avatar img{width:100%;height:100%;object-fit:cover;}
+  .conv .body{flex:1;min-width:0;}
+  .conv .row1{display:flex;justify-content:space-between;align-items:baseline;}
+  .conv .title{font-weight:600;font-size:15px;}
+  .conv .time{font-size:12px;color:var(--muted);flex-shrink:0;margin-left:8px;}
+  .conv .preview{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;}
+
+  /* ---------- Bottom nav (smaller) ---------- */
+  .bnav{position:absolute;left:0;right:0;bottom:var(--safe-bottom);display:grid;grid-template-columns:repeat(4,1fr);background:#fff;border-top:1px solid var(--line);padding:4px 4px 6px;z-index:10;}
+  .bnav .item{display:flex;flex-direction:column;align-items:center;gap:1px;color:var(--muted);font-size:9.5px;position:relative;padding:3px 0;cursor:pointer;-webkit-user-select:none;user-select:none;}
+  .bnav .item.active{color:var(--leny-orange);}
+  .bnav .ico{width:20px;height:20px;display:flex;align-items:center;justify-content:center;}
+  .bnav .item.active svg{stroke:var(--leny-orange);}
+  .bnav .dot{position:absolute;top:0;right:30%;width:7px;height:7px;border-radius:50%;background:var(--bad);}
+
+  /* ---------- FAB ---------- */
+  .fab{position:absolute;right:18px;bottom:calc(58px + var(--safe-bottom));background:var(--leny-orange);color:#fff;border:none;border-radius:999px;padding:12px 18px;font-size:14px;font-weight:600;box-shadow:0 10px 24px -8px rgba(200,80,27,.75);z-index:11;display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .fab:active{transform:translateY(1px);}
+
+  /* ---------- Chat detail screen ---------- */
+  .chat-header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--leny-cream);border-bottom:1px solid var(--line);}
+  .chat-header .back{padding:8px;margin-left:-8px;cursor:pointer;}
+  .chat-header .avatar{width:38px;height:38px;border-radius:50%;overflow:hidden;}
+  .chat-header .avatar img{width:100%;height:100%;object-fit:cover;}
+  .chat-header .info .name{font-weight:600;font-size:15px;}
+  .chat-header .info .status{font-size:11px;color:var(--good);display:flex;align-items:center;gap:4px;}
+  .chat-header .info .status::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--good);}
+  .chat-body{padding:16px 16px 76px;display:flex;flex-direction:column;gap:10px;}
+  .bubble{max-width:78%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.45;}
+  .bubble.bot{background:#fff;border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:6px;}
+  .bubble.me{background:var(--leny-orange);color:#fff;align-self:flex-end;border-bottom-right-radius:6px;}
+  .composer{position:absolute;left:0;right:0;bottom:var(--safe-bottom);background:#fff;border-top:1px solid var(--line);padding:10px 12px;display:flex;gap:8px;align-items:center;z-index:15;flex-direction:column;}
+  .composer .reply-bar{align-self:stretch;display:none;background:var(--leny-cream-2);border-left:3px solid var(--leny-orange);padding:6px 10px;border-radius:6px;font-size:12px;color:#5a3a1e;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .composer .reply-bar.show{display:flex;}
+  .composer .reply-bar .close{cursor:pointer;color:var(--muted);font-size:16px;line-height:1;padding:0 4px;}
+  .composer .row{display:flex;gap:8px;align-items:center;width:100%;}
+  .composer input{flex:1;border:1px solid var(--line);background:var(--leny-cream-2);border-radius:999px;padding:11px 16px;font-size:14px;outline:none;min-width:0;}
+  .composer input:focus{border-color:var(--leny-orange);background:#fff;}
+  .composer .send{background:var(--leny-orange);color:#fff;border:none;border-radius:50%;width:42px;height:42px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+
+  /* ---------- Profile screen ---------- */
+  .profile-hero{display:flex;flex-direction:column;align-items:center;padding:30px 0 18px;}
+  .profile-hero .photo{width:92px;height:92px;border-radius:50%;overflow:hidden;background:#eee;margin-bottom:12px;border:3px solid #fff;box-shadow:0 6px 14px -6px rgba(0,0,0,.2);}
+  .profile-hero .photo img{width:100%;height:100%;object-fit:cover;}
+  .profile-hero .name{font-weight:700;font-size:20px;}
+  .profile-hero .meta{font-size:13px;color:var(--muted);margin-top:2px;}
+  .pcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0;}
+  .pcard h4{margin:0 0 10px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;}
+  .prow{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f1e7d3;cursor:pointer;}
+  .prow:last-child{border-bottom:none;}
+  .prow .lbl{font-size:14px;}
+  .prow .val{font-size:14px;color:var(--muted);}
+  .prow:active{opacity:.7;}
+
+  /* ---------- Services screen ---------- */
+  .svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;}
+  .svc{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;align-items:flex-start;cursor:pointer;}
+  .svc:active{background:var(--leny-cream-2);}
+  .svc .ico{width:42px;height:42px;border-radius:12px;background:var(--leny-cream-2);display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:10px;}
+  .svc .title{font-weight:600;font-size:14px;}
+  .svc .desc{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4;}
+
+  /* ---------- Community feed ---------- */
+  .comm-tabs{display:flex;gap:8px;margin:6px 0 14px;overflow-x:auto;}
+  .comm-tabs::-webkit-scrollbar{display:none;}
+  .comm-tab{font-size:13px;background:var(--leny-cream-2);color:#5a3a1e;padding:8px 14px;border-radius:999px;white-space:nowrap;cursor:pointer;}
+  .comm-tab.active{background:var(--leny-orange);color:#fff;}
+  .post{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;cursor:pointer;transition:background .12s ease;}
+  .post:active{background:#fbf6ec;}
+  .post-head{display:flex;gap:10px;align-items:center;margin-bottom:10px;}
+  .post-avatar{width:38px;height:38px;border-radius:50%;overflow:hidden;flex-shrink:0;}
+  .post-avatar img{width:100%;height:100%;object-fit:cover;}
+  .post-name{font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .post-tag{background:var(--leny-cream-2);color:#5a3a1e;font-size:10px;padding:2px 7px;border-radius:999px;font-weight:500;}
+  .post-tag.verified{background:#e7f1fb;color:#1f6fb8;}
+  .post-meta{font-size:11px;color:var(--muted);margin-top:1px;}
+  .post-body{font-size:14px;line-height:1.5;color:#2a2a2a;}
+  .post-actions{display:flex;gap:18px;margin-top:12px;font-size:12.5px;color:var(--muted);}
+  .post-actions .act{display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:4px 0;}
+  .post-actions .act.liked{color:var(--leny-orange);}
+  .post-actions .act:active{color:var(--leny-orange);}
+
+  /* ---------- Post detail (thread) ---------- */
+  .thread-header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--leny-cream);border-bottom:1px solid var(--line);}
+  .thread-header .back{padding:8px;margin-left:-8px;cursor:pointer;}
+  .thread-header .title{font-weight:600;font-size:16px;}
+  .thread-body{padding:14px 16px 90px;}
+  .thread-orig{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:18px;}
+  .thread-orig .post-body{font-size:15px;}
+  .thread-orig .post-actions{padding-top:10px;border-top:1px solid #f1e7d3;margin-top:14px;}
+  .comments-title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin:6px 4px 10px;}
+  .comment{display:flex;gap:10px;padding:10px 4px 12px;border-bottom:1px solid #efe5d3;}
+  .comment:last-child{border-bottom:none;}
+  .comment.nested{margin-left:30px;border-bottom:none;padding-bottom:6px;}
+  .comment .cavatar{width:34px;height:34px;border-radius:50%;overflow:hidden;flex-shrink:0;}
+  .comment .cavatar img{width:100%;height:100%;object-fit:cover;}
+  .comment .cbody{flex:1;min-width:0;}
+  .comment .chead{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .comment .cname{font-weight:600;font-size:13.5px;}
+  .comment .ctag{background:var(--leny-cream-2);color:#5a3a1e;font-size:9.5px;padding:1.5px 6px;border-radius:999px;font-weight:500;}
+  .comment .ctag.verified{background:#e7f1fb;color:#1f6fb8;}
+  .comment .ctime{font-size:11px;color:var(--muted);margin-left:auto;}
+  .comment .ctext{font-size:14px;color:#2a2a2a;line-height:1.5;margin-top:3px;}
+  .comment .cact{display:flex;gap:14px;margin-top:6px;font-size:12px;color:var(--muted);}
+  .comment .cact span{cursor:pointer;display:inline-flex;align-items:center;gap:4px;}
+  .comment .cact .liked{color:var(--leny-orange);}
+
+  /* ---------- Empty state ---------- */
+  .empty{text-align:center;padding:80px 30px 0;color:var(--muted);}
+  .empty .ico{font-size:42px;margin-bottom:14px;}
+  .empty h3{margin:0 0 8px;color:var(--ink);font-size:16px;}
+  .empty p{margin:0;font-size:13px;line-height:1.55;}
+
+  /* ---------- Sheet (specialty picker) ---------- */
+  .sheet-overlay{position:absolute;inset:0;background:rgba(0,0,0,.4);z-index:20;display:none;align-items:flex-end;}
+  .sheet-overlay.open{display:flex;animation:fadeIn .2s ease;}
+  .sheet{background:#fff;width:100%;border-top-left-radius:24px;border-top-right-radius:24px;padding:8px 16px 24px;max-height:78%;overflow-y:auto;animation:slideUp .25s ease;}
+  .sheet .grab{width:40px;height:4px;background:#e0d8c8;border-radius:2px;margin:8px auto 14px;}
+  .sheet h3{margin:0 0 4px;font-size:18px;}
+  .sheet .sub{font-size:13px;color:var(--muted);margin-bottom:18px;}
+  .sheet-list{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding-bottom:8px;}
+  .slot{display:flex;flex-direction:column;align-items:center;text-align:center;cursor:pointer;}
+  .slot .ring{width:64px;height:64px;border-radius:50%;padding:3px;}
+  .slot .inner{width:100%;height:100%;border-radius:50%;background:#fff;overflow:hidden;}
+  .slot .inner img{width:100%;height:100%;object-fit:cover;}
+  .slot .lbl{font-size:12px;margin-top:6px;}
+
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+  /* helpers */
+  .hide{display:none !important;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- =================== Top bar =================== -->
+  <div class="topbar" id="topbar">
+    <div class="logo">Leny</div>
+    <div class="topicons">
+      <div class="iconbtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+      <div class="iconbtn"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="2"><circle cx="12" cy="6" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="18" r="1.5"/></svg></div>
+    </div>
+  </div>
+
+  <!-- =================== Screens =================== -->
+  <div class="screens">
+
+    <!-- ----- CHATS ----- -->
+    <section class="screen active" id="screen-chats">
+      <div class="screen-inner">
+        <div class="rail-head">
+          Your AI specialists
+          <a href="#" onclick="openSheet();return false;">See all</a>
+        </div>
+        <div class="rail" id="rail"></div>
+        <div class="chats-title">Chats</div>
+        <div id="convlist"></div>
+      </div>
+    </section>
+
+    <!-- ----- SERVICES ----- -->
+    <section class="screen" id="screen-services">
+      <div class="screen-inner">
+        <h2 style="margin:18px 0 4px;font-size:22px;">Services</h2>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">Get care without starting a chat.</div>
+        <div class="svc-grid">
+          <div class="svc" onclick="toast('Book a visit')"><div class="ico">📅</div><div class="title">Book a visit</div><div class="desc">In-person or video</div></div>
+          <div class="svc" onclick="toast('Lab orders')"><div class="ico">🧪</div><div class="title">Lab orders</div><div class="desc">Order, track, review</div></div>
+          <div class="svc" onclick="toast('Prescriptions')"><div class="ico">💊</div><div class="title">Prescriptions</div><div class="desc">Refills & renewals</div></div>
+          <div class="svc" onclick="toast('Symptom check')"><div class="ico">🩺</div><div class="title">Symptom check</div><div class="desc">Quick triage</div></div>
+          <div class="svc" onclick="toast('Mental health')"><div class="ico">🧘</div><div class="title">Mental health</div><div class="desc">Talk it through</div></div>
+          <div class="svc" onclick="toast('Records')"><div class="ico">📂</div><div class="title">My records</div><div class="desc">Visits & history</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ----- COMMUNITY ----- -->
+    <section class="screen" id="screen-community">
+      <div class="screen-inner">
+        <h2 style="margin:18px 0 4px;font-size:22px;">Community</h2>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:14px;">Discussions with other patients and AI specialists.</div>
+        <div class="comm-tabs">
+          <div class="comm-tab active">Trending</div>
+          <div class="comm-tab">Following</div>
+          <div class="comm-tab">My posts</div>
+        </div>
+        <div id="postlist"></div>
+      </div>
+    </section>
+
+    <!-- ----- PROFILE ----- -->
+    <section class="screen" id="screen-profile">
+      <div class="screen-inner">
+        <div class="profile-hero">
+          <div class="photo"><img alt="Michel" src="https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=240&h=240&fit=crop&crop=faces&auto=format" /></div>
+          <div class="name">Michel Choueiri</div>
+          <div class="meta">Member since 2025 · San Diego, CA</div>
+        </div>
+        <div class="pcard">
+          <h4>Health</h4>
+          <div class="prow"><span class="lbl">Conditions</span><span class="val">2 active ›</span></div>
+          <div class="prow"><span class="lbl">Allergies</span><span class="val">None ›</span></div>
+          <div class="prow"><span class="lbl">Medications</span><span class="val">1 active ›</span></div>
+        </div>
+        <div class="pcard">
+          <h4>Account</h4>
+          <div class="prow"><span class="lbl">Insurance</span><span class="val">Aetna PPO ›</span></div>
+          <div class="prow"><span class="lbl">Notifications</span><span class="val">On ›</span></div>
+          <div class="prow"><span class="lbl">Privacy</span><span class="val">›</span></div>
+          <div class="prow"><span class="lbl">Sign out</span><span class="val">›</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ----- CHAT DETAIL ----- -->
+    <section class="screen" id="screen-chat">
+      <div class="chat-header">
+        <div class="back" onclick="closeChat()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1c1c1c" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+        </div>
+        <div class="avatar"><img id="chat-avatar" alt="" /></div>
+        <div class="info"><div class="name" id="chat-name">Specialist</div><div class="status">Online</div></div>
+      </div>
+      <div class="chat-body" id="chat-body"></div>
+      <div class="composer" id="composer">
+        <div class="row">
+          <input id="chat-input" type="text" placeholder="Message Leny…" />
+          <button class="send" onclick="sendMessage()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ----- POST DETAIL ----- -->
+    <section class="screen" id="screen-post">
+      <div class="thread-header">
+        <div class="back" onclick="closePost()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1c1c1c" stroke-width="2.2"><polyline points="15 18 9 12 15 6"/></svg>
+        </div>
+        <div class="title">Discussion</div>
+      </div>
+      <div class="thread-body" id="thread-body"></div>
+      <div class="composer" id="post-composer">
+        <div class="reply-bar" id="reply-bar">
+          <span id="reply-target">Replying to comment</span>
+          <span class="close" onclick="clearReplyTarget()">✕</span>
+        </div>
+        <div class="row">
+          <input id="comment-input" type="text" placeholder="Add a comment…" />
+          <button class="send" onclick="sendComment()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- =================== Floating + New chat =================== -->
+  <button class="fab" id="fab" onclick="openSheet()">＋ New chat</button>
+
+  <!-- =================== Bottom nav =================== -->
+  <nav class="bnav" id="bnav">
+    <div class="item" data-tab="profile">
+      <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b6b6b" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0 1 16 0v1"/></svg></div>
+      Profile
+    </div>
+    <div class="item" data-tab="services">
+      <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b6b6b" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h12"/></svg></div>
+      Services
+    </div>
+    <div class="item" data-tab="community">
+      <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b6b6b" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      Community
+    </div>
+    <div class="item active" data-tab="chats">
+      <div class="dot"></div>
+      <div class="ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c8501b" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      Chats
+    </div>
+  </nav>
+
+  <!-- =================== Specialty picker sheet =================== -->
+  <div class="sheet-overlay" id="sheet" onclick="if(event.target.id==='sheet')closeSheet()">
+    <div class="sheet">
+      <div class="grab"></div>
+      <h3>Pick a specialty</h3>
+      <div class="sub">Your chat will start with an AI specialist matched to the topic.</div>
+      <div class="sheet-list" id="sheet-list"></div>
+    </div>
+  </div>
+
+  <!-- toast -->
+  <div id="toast" style="position:absolute;left:50%;bottom:160px;transform:translateX(-50%);background:#1c1c1c;color:#fff;padding:10px 16px;border-radius:999px;font-size:13px;opacity:0;transition:opacity .25s ease;pointer-events:none;z-index:50;"></div>
+
+</div>
+
+<script>
+  /* ============= DATA ============= */
+  const SPECIALISTS = [
+    { id:"cardio", name:"Cardio",  full:"Cardiology",  ring:"g1", live:true,  img:"https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=240&h=240&fit=crop&crop=faces&auto=format" },
+    { id:"neuro",  name:"Neuro",   full:"Neurology",   ring:"g2", live:false, img:"https://images.unsplash.com/photo-1612531386530-97286d97c2d2?w=240&h=240&fit=crop&crop=faces&auto=format" },
+    { id:"pulmo",  name:"Pulmo",   full:"Pulmonary",   ring:"g3", live:false, img:"https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=240&h=240&fit=crop&crop=faces&auto=format" },
+    { id:"derm",   name:"Derm",    full:"Dermatology", ring:"g4", live:false, img:"https://images.unsplash.com/photo-1551601651-2a8555f1a136?w=240&h=240&fit=crop&crop=faces&auto=format" },
+    { id:"peds",   name:"Peds",    full:"Pediatrics",  ring:"g5", live:false, img:"https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=240&h=240&fit=crop&crop=faces&auto=format" },
+    { id:"obgyn",  name:"OB-GYN",  full:"OB-GYN",      ring:"g6", live:false, img:"https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=240&h=240&fit=crop&crop=faces&auto=format" },
+    { id:"ortho",  name:"Ortho",   full:"Orthopedics", ring:"g7", live:false, img:"https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=240&h=240&fit=crop&crop=faces&auto=format" },
+  ];
+
+  const CONVERSATIONS = [
+    { id:"c1", spec:"cardio", title:"Cardio · Hypertension",   time:"Now",  preview:"Reviewed your latest BP log. Suggested adjustments…",
+      thread:[
+        {from:"bot", text:"Hi Michel — I pulled your last 7 days of BP readings. Averaging 138/87."},
+        {from:"bot", text:"Want to talk through a small medication adjustment or a lifestyle plan first?"},
+        {from:"me",  text:"Lifestyle first."},
+        {from:"bot", text:"Great. Let's start with sodium and sleep. How many hours did you sleep last night?"},
+      ]},
+    { id:"c2", spec:"derm",   title:"Derm · Eczema flare",      time:"2h",   preview:"Photos look like mild flare — let's adjust topical…",
+      thread:[
+        {from:"bot", text:"Thanks for sending the photos. It looks like a mild flare, not infection."},
+        {from:"bot", text:"Switch to the 1% hydrocortisone twice daily for 5 days, then reassess."},
+      ]},
+    { id:"c3", spec:"peds",   title:"Peds · 6-mo check-in",     time:"Yest", preview:"Vaccination schedule confirmed for next visit.",
+      thread:[{from:"bot", text:"Confirmed: next vaccinations due July 14."}]},
+    { id:"c4", spec:"neuro",  title:"Neuro · Migraine pattern", time:"Mon",  preview:"Logged 3 episodes this week. Suggesting MRI follow-up.",
+      thread:[
+        {from:"bot", text:"You've logged 3 migraines this week. The frequency is climbing."},
+        {from:"bot", text:"Let's schedule an MRI to rule out structural causes."},
+      ]},
+    { id:"c5", spec:"pulmo",  title:"Pulmo · Spring allergies", time:"Apr",  preview:"Pollen levels dropping — we can taper antihistamine.",
+      thread:[{from:"bot", text:"Pollen counts are dropping this week. You can taper the antihistamine to every other day."}]},
+  ];
+
+  const POSTS = [
+    {
+      id:"p1",
+      author:"Sarah K.", verified:false,
+      avatar:"https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&h=120&fit=crop&crop=faces&auto=format",
+      tag:"Hypertension", tagVerified:false,
+      time:"2h", likes:318, liked:false,
+      body:"Switched to DASH diet 6 weeks ago — BP dropped from 145/92 to 128/82. What worked for everyone else?",
+      comments:[
+        { id:"p1c1", author:"James R.", avatar:"https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&h=120&fit=crop&crop=faces&auto=format", tag:"Hypertension", time:"1h", likes:42, liked:false, text:"Sleep was the biggest lever for me. 7+ hours and BP dropped 10 points.", replies:[
+            { id:"p1c1r1", author:"Sarah K.", avatar:"https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&h=120&fit=crop&crop=faces&auto=format", time:"1h", likes:8, liked:false, text:"Yes — and going to bed before 11pm seemed to matter more than total hours." }
+          ]},
+        { id:"p1c2", author:"Dr. Patel", verified:true, avatar:"https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=120&h=120&fit=crop&crop=faces&auto=format", tag:"AI Cardio", tagVerified:true, time:"50m", likes:96, liked:false, text:"DASH + reducing sodium below 1500mg/day is the combination with the strongest evidence. Glad it's working for you.", replies:[] },
+        { id:"p1c3", author:"Maya O.", avatar:"https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&h=120&fit=crop&crop=faces&auto=format", tag:"Hypertension", time:"30m", likes:11, liked:false, text:"30 min walks after dinner. Game changer.", replies:[] },
+      ]
+    },
+    {
+      id:"p2",
+      author:"Dr. Patel", verified:true,
+      avatar:"https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=120&h=120&fit=crop&crop=faces&auto=format",
+      tag:"AI Cardio", tagVerified:true,
+      time:"5h", likes:412, liked:false,
+      body:"Quick thread on home BP monitoring: cuff position matters more than most people realize. Here's how to get it right →",
+      comments:[
+        { id:"p2c1", author:"Tom B.", avatar:"https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=120&h=120&fit=crop&crop=faces&auto=format", tag:"Hypertension", time:"3h", likes:18, liked:false, text:"This is why my readings at home were always 10 points lower than at the clinic. Cuff was sliding down.", replies:[] },
+      ]
+    },
+    {
+      id:"p3",
+      author:"Marcus L.", verified:false,
+      avatar:"https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=120&h=120&fit=crop&crop=faces&auto=format",
+      tag:"Migraine", tagVerified:false,
+      time:"Yest", likes:201, liked:false,
+      body:"Anyone else find that caffeine timing matters more than total caffeine? Cutting after noon eliminated my evening migraines.",
+      comments:[
+        { id:"p3c1", author:"Lena W.", avatar:"https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=120&h=120&fit=crop&crop=faces&auto=format", tag:"Migraine", time:"22h", likes:7, liked:false, text:"Same. Stopping at 11am completely changed my sleep + headache pattern.", replies:[] },
+      ]
+    },
+    {
+      id:"p4",
+      author:"Priya M.", verified:false,
+      avatar:"https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&h=120&fit=crop&crop=faces&auto=format",
+      tag:"Eczema", tagVerified:false,
+      time:"2d", likes:124, liked:false,
+      body:"My derm AI suggested ceramide moisturizer + fragrance-free everything. Six weeks in — flares basically gone. Sharing my routine.",
+      comments:[]
+    },
+  ];
+
+  /* ============= RAIL ============= */
+  function renderRail(){
+    const rail = document.getElementById("rail");
+    rail.innerHTML = "";
+    SPECIALISTS.forEach(s => {
+      const el = document.createElement("div");
+      el.className = "agent";
+      el.innerHTML = `
+        <div class="ring ${s.ring} ${s.live?"live":""}">
+          <div class="inner"><img alt="${s.full}" src="${s.img}" /></div>
+        </div>
+        <div class="name">${s.name}</div>`;
+      el.addEventListener("click", () => startChatWithSpecialist(s.id));
+      rail.appendChild(el);
+    });
+    const add = document.createElement("div");
+    add.className = "agent";
+    add.innerHTML = `
+      <div class="ring add"><div class="inner plus">＋</div></div>
+      <div class="name">More</div>`;
+    add.addEventListener("click", openSheet);
+    rail.appendChild(add);
+  }
+
+  /* ============= CHATS LIST ============= */
+  function renderConvs(){
+    const list = document.getElementById("convlist");
+    list.innerHTML = "";
+    if(CONVERSATIONS.length === 0){
+      list.innerHTML = `<div class="empty"><div class="ico">💬</div><h3>No conversations</h3><p>Start a new chat with a specialist using the + button below.</p></div>`;
+      return;
+    }
+    CONVERSATIONS.forEach(c => {
+      const sp = SPECIALISTS.find(s => s.id===c.spec);
+      const row = document.createElement("div");
+      row.className = "conv";
+      row.innerHTML = `
+        <div class="avatar"><img alt="${sp.full}" src="${sp.img}" /></div>
+        <div class="body">
+          <div class="row1"><div class="title">${c.title}</div><div class="time">${c.time}</div></div>
+          <div class="preview">${c.preview}</div>
+        </div>`;
+      row.addEventListener("click", () => openChat(c.id));
+      list.appendChild(row);
+    });
+  }
+
+  /* ============= COMMUNITY ============= */
+  function commentCount(p){
+    let n = p.comments.length;
+    p.comments.forEach(c => n += (c.replies||[]).length);
+    return n;
+  }
+  function renderPosts(){
+    const list = document.getElementById("postlist");
+    list.innerHTML = "";
+    POSTS.forEach(p => {
+      const el = document.createElement("div");
+      el.className = "post";
+      el.innerHTML = `
+        <div class="post-head">
+          <div class="post-avatar"><img alt="${p.author}" src="${p.avatar}" /></div>
+          <div>
+            <div class="post-name">${p.author} <span class="post-tag ${p.tagVerified?'verified':''}">${p.tag}</span></div>
+            <div class="post-meta">${p.time} · ${commentCount(p)} replies</div>
+          </div>
+        </div>
+        <div class="post-body">${p.body}</div>
+        <div class="post-actions">
+          <span class="act"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> ${commentCount(p)}</span>
+          <span class="act like ${p.liked?'liked':''}" data-pid="${p.id}"><svg width="15" height="15" viewBox="0 0 24 24" fill="${p.liked?'currentColor':'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> ${p.likes}</span>
+          <span class="act"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></span>
+        </div>`;
+      // open thread when tapping post body or comment count
+      el.addEventListener("click", (e) => {
+        // don't open if user tapped the like or share action
+        if(e.target.closest(".act.like") || e.target.closest(".act:last-child")) return;
+        openPost(p.id);
+      });
+      // like toggle
+      const likeBtn = el.querySelector(".act.like");
+      likeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        p.liked = !p.liked;
+        p.likes += p.liked ? 1 : -1;
+        renderPosts();
+      });
+      list.appendChild(el);
+    });
+  }
+
+  /* ============= POST DETAIL ============= */
+  let currentPostId = null;
+  let replyTargetId = null;
+  function openPost(id){
+    currentPostId = id;
+    replyTargetId = null;
+    document.getElementById("topbar").classList.add("hide");
+    document.getElementById("bnav").classList.add("hide");
+    document.getElementById("fab").classList.add("hide");
+    showScreen("screen-post");
+    renderThread();
+  }
+  function closePost(){
+    currentPostId = null;
+    replyTargetId = null;
+    document.getElementById("topbar").classList.remove("hide");
+    document.getElementById("bnav").classList.remove("hide");
+    activateTab("community");
+    showScreen("screen-community");
+  }
+  function renderThread(){
+    const p = POSTS.find(x => x.id===currentPostId);
+    if(!p) return;
+    const body = document.getElementById("thread-body");
+    body.innerHTML = "";
+
+    // Original post
+    const orig = document.createElement("div");
+    orig.className = "thread-orig";
+    orig.innerHTML = `
+      <div class="post-head">
+        <div class="post-avatar"><img alt="${p.author}" src="${p.avatar}" /></div>
+        <div>
+          <div class="post-name">${p.author} <span class="post-tag ${p.tagVerified?'verified':''}">${p.tag}</span></div>
+          <div class="post-meta">${p.time}</div>
+        </div>
+      </div>
+      <div class="post-body">${p.body}</div>
+      <div class="post-actions">
+        <span class="act like-orig ${p.liked?'liked':''}"><svg width="15" height="15" viewBox="0 0 24 24" fill="${p.liked?'currentColor':'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> ${p.likes}</span>
+        <span class="act"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> ${commentCount(p)} replies</span>
+        <span class="act"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></span>
+      </div>`;
+    orig.querySelector(".like-orig").addEventListener("click", (e) => {
+      e.stopPropagation();
+      p.liked = !p.liked;
+      p.likes += p.liked ? 1 : -1;
+      renderThread();
+    });
+    body.appendChild(orig);
+
+    // Comments title
+    const ttl = document.createElement("div");
+    ttl.className = "comments-title";
+    ttl.textContent = `${commentCount(p)} replies`;
+    body.appendChild(ttl);
+
+    // Comments
+    if(p.comments.length === 0){
+      const empty = document.createElement("div");
+      empty.style.cssText = "text-align:center;padding:30px 16px;color:var(--muted);font-size:13px;";
+      empty.textContent = "No replies yet — be the first.";
+      body.appendChild(empty);
+    } else {
+      p.comments.forEach(c => {
+        body.appendChild(renderComment(c, false));
+        (c.replies||[]).forEach(r => {
+          body.appendChild(renderComment(r, true, c));
+        });
+      });
+    }
+  }
+
+  function renderComment(c, nested, parent){
+    const el = document.createElement("div");
+    el.className = "comment" + (nested ? " nested" : "");
+    el.innerHTML = `
+      <div class="cavatar"><img alt="${c.author}" src="${c.avatar}" /></div>
+      <div class="cbody">
+        <div class="chead">
+          <span class="cname">${c.author}</span>
+          ${c.tag ? `<span class="ctag ${c.tagVerified?'verified':''}">${c.tag}</span>` : ""}
+          <span class="ctime">${c.time}</span>
+        </div>
+        <div class="ctext">${c.text}</div>
+        <div class="cact">
+          <span class="like ${c.liked?'liked':''}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="${c.liked?'currentColor':'none'}" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            ${c.likes}
+          </span>
+          <span class="reply">↩ Reply</span>
+        </div>
+      </div>`;
+    el.querySelector(".like").addEventListener("click", () => {
+      c.liked = !c.liked;
+      c.likes += c.liked ? 1 : -1;
+      renderThread();
+    });
+    el.querySelector(".reply").addEventListener("click", () => {
+      // when replying to a nested reply, attach reply to parent comment
+      const targetForReply = nested ? parent : c;
+      setReplyTarget(targetForReply.id, c.author);
+    });
+    return el;
+  }
+
+  function setReplyTarget(cid, name){
+    replyTargetId = cid;
+    document.getElementById("reply-target").textContent = "Replying to " + name;
+    document.getElementById("reply-bar").classList.add("show");
+    const input = document.getElementById("comment-input");
+    input.placeholder = `Reply to ${name}…`;
+    setTimeout(() => input.focus(), 60);
+  }
+  function clearReplyTarget(){
+    replyTargetId = null;
+    document.getElementById("reply-bar").classList.remove("show");
+    document.getElementById("comment-input").placeholder = "Add a comment…";
+  }
+
+  function sendComment(){
+    const input = document.getElementById("comment-input");
+    const txt = input.value.trim();
+    if(!txt || !currentPostId) return;
+    const p = POSTS.find(x => x.id===currentPostId);
+    const newComment = {
+      id:"new_"+Date.now(),
+      author:"Michel Choueiri",
+      avatar:"https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=120&h=120&fit=crop&crop=faces&auto=format",
+      tag:"You",
+      time:"Now",
+      likes:0, liked:false,
+      text:txt,
+      replies:[]
+    };
+    if(replyTargetId){
+      const target = p.comments.find(c => c.id===replyTargetId);
+      if(target){
+        target.replies = target.replies || [];
+        target.replies.push(newComment);
+      } else {
+        p.comments.push(newComment);
+      }
+    } else {
+      p.comments.push(newComment);
+    }
+    input.value = "";
+    clearReplyTarget();
+    renderThread();
+    // scroll new comment into view
+    setTimeout(() => {
+      const tb = document.getElementById("thread-body");
+      tb.scrollTop = tb.scrollHeight;
+    }, 50);
+  }
+  document.getElementById("comment-input").addEventListener("keydown", e => {
+    if(e.key==="Enter") sendComment();
+  });
+
+  /* ============= TABS ============= */
+  function showScreen(id){
+    document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+  }
+  function activateTab(tab){
+    document.querySelectorAll(".bnav .item").forEach(i => i.classList.remove("active"));
+    document.querySelector(`.bnav .item[data-tab="${tab}"]`).classList.add("active");
+  }
+  document.querySelectorAll(".bnav .item").forEach(item => {
+    item.addEventListener("click", () => {
+      const tab = item.dataset.tab;
+      activateTab(tab);
+      document.getElementById("topbar").classList.remove("hide");
+      document.getElementById("bnav").classList.remove("hide");
+      document.getElementById("fab").classList.toggle("hide", tab!=="chats");
+      showScreen("screen-"+tab);
+    });
+  });
+  document.querySelectorAll(".comm-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".comm-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+    });
+  });
+
+  /* ============= CHAT DETAIL ============= */
+  let currentChatId = null;
+  function openChat(id){
+    const c = CONVERSATIONS.find(x => x.id===id);
+    if(!c) return;
+    currentChatId = id;
+    const sp = SPECIALISTS.find(s => s.id===c.spec);
+    document.getElementById("chat-avatar").src = sp.img;
+    document.getElementById("chat-name").textContent = c.title;
+    redrawChat();
+    document.getElementById("topbar").classList.add("hide");
+    document.getElementById("bnav").classList.add("hide");
+    document.getElementById("fab").classList.add("hide");
+    showScreen("screen-chat");
+  }
+  function closeChat(){
+    document.getElementById("topbar").classList.remove("hide");
+    document.getElementById("bnav").classList.remove("hide");
+    document.getElementById("fab").classList.remove("hide");
+    activateTab("chats");
+    showScreen("screen-chats");
+    currentChatId = null;
+  }
+  function sendMessage(){
+    const input = document.getElementById("chat-input");
+    const txt = input.value.trim();
+    if(!txt || !currentChatId) return;
+    const c = CONVERSATIONS.find(x => x.id===currentChatId);
+    c.thread.push({from:"me", text:txt});
+    c.preview = txt;
+    c.time = "Now";
+    input.value = "";
+    redrawChat();
+    setTimeout(() => {
+      c.thread.push({from:"bot", text:"Got it — let me look that up for you."});
+      if(currentChatId) redrawChat();
+    }, 900);
+  }
+  function redrawChat(){
+    const c = CONVERSATIONS.find(x => x.id===currentChatId);
+    if(!c) return;
+    const body = document.getElementById("chat-body");
+    body.innerHTML = "";
+    c.thread.forEach(m => {
+      const b = document.createElement("div");
+      b.className = "bubble " + (m.from==="me" ? "me" : "bot");
+      b.textContent = m.text;
+      body.appendChild(b);
+    });
+    setTimeout(() => body.scrollTop = body.scrollHeight, 30);
+  }
+  document.getElementById("chat-input").addEventListener("keydown", e => {
+    if(e.key==="Enter") sendMessage();
+  });
+
+  /* ============= SPECIALTY SHEET ============= */
+  function openSheet(){
+    const list = document.getElementById("sheet-list");
+    list.innerHTML = "";
+    SPECIALISTS.forEach(s => {
+      const slot = document.createElement("div");
+      slot.className = "slot";
+      slot.innerHTML = `
+        <div class="ring ${s.ring}"><div class="inner"><img alt="${s.full}" src="${s.img}" /></div></div>
+        <div class="lbl">${s.full}</div>`;
+      slot.addEventListener("click", () => {
+        closeSheet();
+        startChatWithSpecialist(s.id);
+      });
+      list.appendChild(slot);
+    });
+    document.getElementById("sheet").classList.add("open");
+  }
+  function closeSheet(){ document.getElementById("sheet").classList.remove("open"); }
+
+  function startChatWithSpecialist(id){
+    let conv = CONVERSATIONS.find(c => c.spec===id);
+    if(!conv){
+      const sp = SPECIALISTS.find(s => s.id===id);
+      conv = {
+        id:"new_"+Date.now(), spec:id,
+        title:`${sp.full} · New chat`,
+        time:"Now", preview:"Hi — what's going on?",
+        thread:[{from:"bot", text:`Hi Michel, I'm your AI ${sp.full} specialist. What brings you in today?`}]
+      };
+      CONVERSATIONS.unshift(conv);
+      renderConvs();
+    }
+    openChat(conv.id);
+  }
+
+  /* ============= TOAST ============= */
+  let toastTimer;
+  function toast(msg){
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.style.opacity = 1;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=> t.style.opacity = 0, 1500);
+  }
+
+  /* ============= INIT ============= */
+  renderRail();
+  renderConvs();
+  renderPosts();
+</script>
+</body>
+</html>

@@ -9,11 +9,12 @@ type MagazineEditorProps = {
   selectedPageId: string;
   onSelectPage: (pageId: string) => void;
   onChange: (updatedBook: FlipbookItem) => void;
+  onCoverUpload: (file: File) => void;
   onSave: () => void;
   onClose: () => void;
 };
 
-export function MagazineEditor({ book, selectedPageId, onSelectPage, onChange, onSave, onClose }: MagazineEditorProps) {
+export function MagazineEditor({ book, selectedPageId, onSelectPage, onChange, onCoverUpload, onSave, onClose }: MagazineEditorProps) {
   const coverUploadRef = useRef<HTMLInputElement>(null);
   const selectedPage = book.pages?.find((page) => page.id === selectedPageId) ?? null;
   const imagePages = (book.pages ?? []).filter((page) => page.contentKind === "image");
@@ -73,7 +74,7 @@ export function MagazineEditor({ book, selectedPageId, onSelectPage, onChange, o
       return;
     }
 
-    updateBook({ coverImageUrl: URL.createObjectURL(file) });
+    onCoverUpload(file);
   };
 
   return (

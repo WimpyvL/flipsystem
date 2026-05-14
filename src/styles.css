@@ -1876,6 +1876,8 @@ textarea.editor-input {
   position: relative;
   min-height: 0;
   display: grid;
+  grid-template-rows: minmax(0, auto) auto;
+  align-content: start;
   padding: 10px 22px 22px;
 }
 
@@ -2027,10 +2029,24 @@ textarea.editor-input {
 
 .canvas-page-strip {
   display: flex;
+  align-items: flex-start;
   gap: 10px;
   overflow-x: auto;
+  align-self: start;
   margin-top: 14px;
-  padding: 2px 0;
+  padding: 2px 0 4px;
+  max-height: 68px;
+}
+
+.canvas-page-strip .page-jump {
+  flex: 0 0 86px;
+  min-width: 86px;
+  min-height: 50px;
+  height: 50px;
+  align-self: flex-start;
+  align-content: center;
+  padding: 8px 10px;
+  border-radius: 10px;
 }
 
 .canvas-editor-drawer {
