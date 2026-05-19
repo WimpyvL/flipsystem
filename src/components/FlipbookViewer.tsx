@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HTMLFlipBook from "react-pageflip";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import {
@@ -10,6 +10,7 @@ import {
   ExternalLink,
   FileQuestion,
   Loader2,
+  Minimize2,
   Plus,
   X
 } from "lucide-react";
@@ -432,6 +433,15 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
     offsetY: number;
   } | null>(null);
 
+  // Pinch-to-zoom state (direct DOM for performance, React state only for UI flags)
+  const zoomContainerRef = useRef<HTMLDivElement | null>(null);
+  const zoomRef = useRef({ scale: 1, x: 0, y: 0 });
+  const pinchRef = useRef<{ dist: number; scale: number; lastMidX: number; lastMidY: number } | null>(null);
+  const panTouchRef = useRef<{ x: number; y: number } | null>(null);
+  const lastTapTimeRef = useRef(0);
+  const wasPinchingRef = useRef(false);
+  const [isZoomed, setIsZoomed] = useState(false);
+
   const isPdf = book.contentKind === "pdf";
   const isMagazine = book.contentKind === "magazine";
   const isFlipbook = isPdf || isMagazine;
@@ -626,6 +636,152 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
 
   const detailLensZoom = layout.isMobile ? 1.7 : 2;
   const showPresentationDetailLens = isPresentation && !isTouchCapable;
+
+  // --- Pinch-to-zoom helpers (direct DOM for 60fps) ---
+  const applyZoomTransform = useCallback(() => {
+    const el = zoomContainerRef.current;
+    if (!el) return;
+    const { scale, x, y } = zoomRef.current;
+    el.style.transform = scale > 1.01 ? `translate(${x}px, ${y}px) scale(${scale})` : '';
+  }, []);
+
+  const resetZoom = useCallback((animated = true) => {
+    zoomRef.current = { scale: 1, x: 0, y: 0 };
+    setIsZoomed(false);
+    const el = zoomContainerRef.current;
+    if (!el) return;
+    if (animated) {
+      el.style.transition = 'transform 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+      el.style.transform = '';
+      el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
+    } else {
+      el.style.transform = '';
+    }
+  }, []);
+
+  // Pinch-to-zoom gesture handler — capture phase to intercept before page-flip
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || !isFlipbook || !isTouchCapable) return;
+
+    const getDist = (a: Touch, b: Touch) => Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        e.stopPropagation();
+        e.preventDefault();
+        const d = getDist(e.touches[0], e.touches[1]);
+        const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        pinchRef.current = { dist: d, scale: zoomRef.current.scale, lastMidX: mx, lastMidY: my };
+        panTouchRef.current = null;
+        wasPinchingRef.current = true;
+        return;
+      }
+      if (e.touches.length === 1 && zoomRef.current.scale > 1.05) {
+        e.stopPropagation();
+        e.preventDefault();
+        panTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (pinchRef.current && e.touches.length >= 2) {
+        e.stopPropagation();
+        e.preventDefault();
+        const d = getDist(e.touches[0], e.touches[1]);
+        const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const newScale = clamp(pinchRef.current.scale * (d / pinchRef.current.dist), 1, 4);
+        const stageRect = stage.getBoundingClientRect();
+        const cx = mx - stageRect.left;
+        const cy = my - stageRect.top;
+        const prevScale = zoomRef.current.scale;
+        const ratio = prevScale > 0.01 ? newScale / prevScale : 1;
+        const panDx = mx - pinchRef.current.lastMidX;
+        const panDy = my - pinchRef.current.lastMidY;
+        pinchRef.current.lastMidX = mx;
+        pinchRef.current.lastMidY = my;
+        zoomRef.current = {
+          scale: newScale,
+          x: (zoomRef.current.x - cx) * ratio + cx + panDx,
+          y: (zoomRef.current.y - cy) * ratio + cy + panDy,
+        };
+        setIsZoomed(newScale > 1.05);
+        applyZoomTransform();
+        return;
+      }
+      if (panTouchRef.current && e.touches.length === 1 && zoomRef.current.scale > 1.05) {
+        e.stopPropagation();
+        e.preventDefault();
+        const dx = e.touches[0].clientX - panTouchRef.current.x;
+        const dy = e.touches[0].clientY - panTouchRef.current.y;
+        panTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        zoomRef.current.x += dx;
+        zoomRef.current.y += dy;
+        applyZoomTransform();
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) pinchRef.current = null;
+      if (e.touches.length === 0) {
+        panTouchRef.current = null;
+        // Snap back if barely zoomed
+        if (zoomRef.current.scale < 1.1) {
+          resetZoom(true);
+        }
+        // Double-tap to toggle zoom
+        if (!wasPinchingRef.current) {
+          const now = Date.now();
+          if (now - lastTapTimeRef.current < 300) {
+            if (zoomRef.current.scale > 1.05) {
+              resetZoom(true);
+            } else {
+              const t = e.changedTouches[0];
+              if (t) {
+                const rect = stage.getBoundingClientRect();
+                const cx = t.clientX - rect.left;
+                const cy = t.clientY - rect.top;
+                const target = 2.5;
+                zoomRef.current = { scale: target, x: cx - cx * target, y: cy - cy * target };
+                setIsZoomed(true);
+                const el = zoomContainerRef.current;
+                if (el) {
+                  el.style.transition = 'transform 280ms cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+                  el.style.transform = `translate(${zoomRef.current.x}px, ${zoomRef.current.y}px) scale(${target})`;
+                  el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
+                }
+              }
+            }
+            lastTapTimeRef.current = 0;
+          } else {
+            lastTapTimeRef.current = now;
+          }
+        }
+        wasPinchingRef.current = false;
+      }
+      // If one finger remains after pinch, start panning
+      if (e.touches.length === 1 && zoomRef.current.scale > 1.05) {
+        panTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+    };
+
+    stage.addEventListener('touchstart', handleTouchStart, { capture: true, passive: false });
+    stage.addEventListener('touchmove', handleTouchMove, { capture: true, passive: false });
+    stage.addEventListener('touchend', handleTouchEnd, { capture: true });
+
+    return () => {
+      stage.removeEventListener('touchstart', handleTouchStart, { capture: true });
+      stage.removeEventListener('touchmove', handleTouchMove, { capture: true });
+      stage.removeEventListener('touchend', handleTouchEnd, { capture: true });
+    };
+  }, [applyZoomTransform, isFlipbook, isTouchCapable, resetZoom]);
+
+  // Reset zoom when page changes
+  useEffect(() => {
+    if (zoomRef.current.scale > 1.01) resetZoom(false);
+  }, [currentPageIndex, resetZoom]);
 
   const displayLabel = useMemo(() => {
     if (totalPages <= 0) {
@@ -864,7 +1020,7 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
         <div className="flipbook-shell">
           <div
             ref={stageRef}
-            className={`flipbook-stage ${isPresentation && isDetailLensOpen ? "detail-lens-active" : ""}`}
+            className={`flipbook-stage ${isPresentation && isDetailLensOpen ? "detail-lens-active" : ""} ${isZoomed ? "is-pinch-zoomed" : ""}`}
             onPointerMove={handleLensDrag}
             onPointerUp={endLensDrag}
             onPointerLeave={endLensDrag}
@@ -896,28 +1052,42 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
               </div>
             ) : null}
 
-            <PageFlipBook
-              ref={bookRef as never}
-              className="flipbook-root"
-              width={layout.pageWidth}
-              height={layout.pageHeight}
-              size="fixed"
-              minWidth={200}
-              maxWidth={isPresentation ? 860 : 640}
-              minHeight={200}
-              maxHeight={isPresentation ? 1400 : 1080}
-              maxShadowOpacity={isPresentation ? 0.9 : 0.65}
-              showCover
-              mobileScrollSupport={false}
-              useMouseEvents
-              flippingTime={isPresentation ? 900 : 700}
-              drawShadow
-              usePortrait={layout.isMobile}
-              swipeDistance={30}
-              onFlip={(event: FlipEvent) => setCurrentPageIndex(event.data)}
-            >
-              {flipbookChildren}
-            </PageFlipBook>
+            {isTouchCapable && isZoomed ? (
+              <button
+                type="button"
+                className="pinch-zoom-reset-btn"
+                onClick={() => resetZoom(true)}
+                aria-label="Reset zoom"
+              >
+                <Minimize2 size={16} />
+                <span>Reset</span>
+              </button>
+            ) : null}
+
+            <div ref={zoomContainerRef} className="flipbook-zoom-container">
+              <PageFlipBook
+                ref={bookRef as never}
+                className="flipbook-root"
+                width={layout.pageWidth}
+                height={layout.pageHeight}
+                size="fixed"
+                minWidth={200}
+                maxWidth={isPresentation ? 860 : 640}
+                minHeight={200}
+                maxHeight={isPresentation ? 1400 : 1080}
+                maxShadowOpacity={isPresentation ? 0.9 : 0.65}
+                showCover
+                mobileScrollSupport={false}
+                useMouseEvents
+                flippingTime={isPresentation ? 900 : 700}
+                drawShadow
+                usePortrait={layout.isMobile}
+                swipeDistance={30}
+                onFlip={(event: FlipEvent) => setCurrentPageIndex(event.data)}
+              >
+                {flipbookChildren}
+              </PageFlipBook>
+            </div>
 
             {showPresentationDetailLens && isDetailLensOpen && activeRenderablePage && activePageMetrics ? (
               <div
@@ -963,7 +1133,7 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
 
           {isPresentation && currentPageIndex <= 0 ? (
             <div className="presentation-hint">
-              {isTouchCapable ? "Swipe to open the magazine. Pinch to zoom." : "Click or swipe to open the magazine"}
+              {isTouchCapable ? "Swipe to flip pages · Pinch to zoom · Double-tap to zoom in" : "Click or swipe to open the magazine"}
             </div>
           ) : null}
 
