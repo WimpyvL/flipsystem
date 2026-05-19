@@ -1404,7 +1404,7 @@ button {
 }
 
 .presentation-viewer .flipbook-stage {
-  overflow: auto;
+  overflow: hidden;
   touch-action: pinch-zoom pan-x pan-y;
   overscroll-behavior: contain;
 }
@@ -1414,6 +1414,29 @@ button {
     drop-shadow(0 2px 4px rgba(0, 0, 0, 0.34))
     drop-shadow(0 26px 56px rgba(0, 0, 0, 0.72))
     drop-shadow(0 0 36px rgba(184, 132, 42, 0.14));
+  isolation: isolate;
+}
+
+.presentation-viewer .stf__block {
+  overflow: hidden;
+}
+
+.presentation-viewer .stf__item {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.presentation-viewer .stf__item.--soft:not(.--simple) .flip-page {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 248, 235, 0.08),
+    0 14px 28px rgba(0, 0, 0, 0.16);
+}
+
+.presentation-viewer .stf__item.--soft:not(.--simple) .flip-page::before {
+  background:
+    linear-gradient(90deg, rgba(0, 0, 0, 0.14), transparent 7%, transparent 93%, rgba(0, 0, 0, 0.08)),
+    linear-gradient(180deg, rgba(255, 250, 242, 0.04), transparent 12%, transparent 88%, rgba(0, 0, 0, 0.04)),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 0, 0, 0.008) 2px, rgba(0, 0, 0, 0.008) 4px);
 }
 
 .presentation-stage-actions {

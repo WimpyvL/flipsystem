@@ -906,11 +906,11 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
               maxWidth={isPresentation ? 860 : 640}
               minHeight={200}
               maxHeight={isPresentation ? 1400 : 1080}
-              maxShadowOpacity={0.65}
+              maxShadowOpacity={isPresentation ? 0.9 : 0.65}
               showCover
               mobileScrollSupport={false}
               useMouseEvents
-              flippingTime={700}
+              flippingTime={isPresentation ? 900 : 700}
               drawShadow
               usePortrait={layout.isMobile}
               swipeDistance={30}
