@@ -517,9 +517,25 @@ export function PageDesignEditor({
             ))}
           </div>
         </div>
+
+        <button
+          type="button"
+          className={`canvas-editor-edge-toggle ${isDrawerOpen ? "open" : "closed"}`}
+          onClick={() => setIsDrawerOpen((current) => !current)}
+          aria-expanded={isDrawerOpen}
+          aria-controls="canvas-editor-drawer"
+          aria-label={isDrawerOpen ? "Collapse editor tools" : "Open editor tools"}
+        >
+          <span className="canvas-editor-edge-toggle-label">Tools</span>
+          {isDrawerOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+        </button>
       </div>
 
-      <aside className={`canvas-editor-drawer ${isDrawerOpen ? "open" : "closed"}`}>
+      <aside
+        id="canvas-editor-drawer"
+        className={`canvas-editor-drawer ${isDrawerOpen ? "open" : "closed"}`}
+        aria-hidden={!isDrawerOpen}
+      >
         <div className="canvas-editor-drawer-scroll">
           <div className="canvas-editor-drawer-head">
             <div>

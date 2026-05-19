@@ -9,7 +9,9 @@ import {
   Download,
   ExternalLink,
   FileQuestion,
-  Loader2
+  Loader2,
+  Plus,
+  X
 } from "lucide-react";
 import { formatBytes, getContentLabel, isVimeoEmbedUrl } from "../content";
 import { resolvePageLayout } from "../pageLayouts";
@@ -28,6 +30,18 @@ type ViewportSize = {
   height: number;
 };
 
+type LensPosition = {
+  x: number;
+  y: number;
+};
+
+type PageMetrics = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
 type CoverProps = {
   title: string;
   subtitle?: string;
@@ -40,6 +54,7 @@ type PdfCanvasPageProps = {
   pageNumber: number;
   pageWidth: number;
   pageHeight: number;
+  showPageNumber?: boolean;
 };
 
 type NativeContentPreviewProps = {
@@ -48,6 +63,7 @@ type NativeContentPreviewProps = {
 
 type PageContentPreviewProps = {
   page: ContentPage;
+  showMeta?: boolean;
 };
 
 type PdfSource = {
@@ -82,6 +98,8 @@ const getViewportSize = (): ViewportSize => ({
   height: window.innerHeight
 });
 
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
 const CoverPage = React.forwardRef<HTMLDivElement, CoverProps>(function CoverPage(
   { title, subtitle, isBack = false, coverImage },
   ref
@@ -111,7 +129,7 @@ const CoverPage = React.forwardRef<HTMLDivElement, CoverProps>(function CoverPag
 });
 
 const PdfCanvasPage = React.forwardRef<HTMLDivElement, PdfCanvasPageProps>(function PdfCanvasPage(
-  { pdfDoc, pageNumber, pageWidth, pageHeight },
+  { pdfDoc, pageNumber, pageWidth, pageHeight, showPageNumber = true },
   ref
 ) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -182,7 +200,7 @@ const PdfCanvasPage = React.forwardRef<HTMLDivElement, PdfCanvasPageProps>(funct
         {isRendering ? <div className="flip-page-loading">Rendering page {pageNumber}...</div> : null}
         <canvas ref={canvasRef} className="flip-page-canvas" />
       </div>
-      <div className="flip-page-number">{pageNumber}</div>
+      {showPageNumber ? <div className="flip-page-number">{pageNumber}</div> : null}
     </div>
   );
 });
@@ -287,7 +305,7 @@ function NativeContentPreview({ book }: NativeContentPreviewProps) {
 }
 
 const PageContentPreview = React.forwardRef<HTMLDivElement, PageContentPreviewProps>(function PageContentPreview(
-  { page },
+  { page, showMeta = true },
   ref
 ) {
   const layout = resolvePageLayout(page);
@@ -305,11 +323,13 @@ const PageContentPreview = React.forwardRef<HTMLDivElement, PageContentPreviewPr
     <div ref={ref} className={`flip-page ${themeClass} ${isFullPageMedia ? "asset-cover-page" : ""}`}>
       <div className={`flip-page-frame mixed-page-frame layout-${layout.preset}`}>
         <div className={`mixed-page-layout ${themeClass} ${isSplitLayout ? "is-split" : ""} ${isSpotlightLayout ? "is-spotlight" : ""} ${isStackLayout ? "is-stack" : ""} ${isQuoteLayout ? "is-quote" : ""}`}>
-          <div className="mixed-page-copy">
-            <span className="mixed-page-kicker">{layout.kicker}</span>
-            <h3>{layout.headline}</h3>
-            {layout.body ? <p className="mixed-page-body">{layout.body}</p> : null}
-          </div>
+          {showMeta ? (
+            <div className="mixed-page-copy">
+              <span className="mixed-page-kicker">{layout.kicker}</span>
+              <h3>{layout.headline}</h3>
+              {layout.body ? <p className="mixed-page-body">{layout.body}</p> : null}
+            </div>
+          ) : null}
 
           <div className="mixed-page-asset">
             {page.contentKind === "image" ? (
@@ -344,10 +364,33 @@ const PageContentPreview = React.forwardRef<HTMLDivElement, PageContentPreviewPr
           </div>
         </div>
       </div>
-      <div className="flip-page-number">{pageLabel}</div>
+      {showMeta ? <div className="flip-page-number">{pageLabel}</div> : null}
     </div>
   );
 });
+
+type ZoomPagePreviewProps = {
+  page: RenderablePage;
+  pageWidth: number;
+  pageHeight: number;
+  showMeta?: boolean;
+};
+
+function ZoomPagePreview({ page, pageWidth, pageHeight, showMeta = true }: ZoomPagePreviewProps) {
+  if (page.kind === "pdf") {
+    return (
+      <PdfCanvasPage
+        pdfDoc={page.pdfDoc}
+        pageNumber={page.pageNumber}
+        pageWidth={pageWidth}
+        pageHeight={pageHeight}
+        showPageNumber={showMeta}
+      />
+    );
+  }
+
+  return <PageContentPreview page={page.page} showMeta={showMeta} />;
+}
 
 type FlipbookViewerProps = {
   book: FlipbookItem;
@@ -375,14 +418,28 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [viewportSize, setViewportSize] = useState<ViewportSize>(getViewportSize);
   const [pageAspectRatio, setPageAspectRatio] = useState(1.4142);
+  const [isDetailLensOpen, setIsDetailLensOpen] = useState(false);
+  const [detailLensPosition, setDetailLensPosition] = useState<LensPosition>({ x: 24, y: 24 });
+  const [activePageMetrics, setActivePageMetrics] = useState<PageMetrics | null>(null);
   const bookRef = useRef<{
     pageFlip?: () => { flipPrev: () => void; flipNext: () => void; turnToPage: (index: number) => void };
+  } | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const pageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const lensDragStateRef = useRef<{
+    pointerId: number;
+    offsetX: number;
+    offsetY: number;
   } | null>(null);
 
   const isPdf = book.contentKind === "pdf";
   const isMagazine = book.contentKind === "magazine";
   const isFlipbook = isPdf || isMagazine;
   const isPresentation = variant === "presentation";
+  const legacyNavigator = navigator as Navigator & { msMaxTouchPoints?: number };
+  const isTouchCapable =
+    typeof window !== "undefined" &&
+    ("ontouchstart" in window || navigator.maxTouchPoints > 0 || (legacyNavigator.msMaxTouchPoints ?? 0) > 0);
 
   const magazinePages = useMemo(() => (isMagazine ? book.pages ?? [] : []), [book.pages, isMagazine]);
   const selectedEditorPage = useMemo(
@@ -457,6 +514,8 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
   }, [isFlipbook, isPdf, loadedPdfSources, magazinePages]);
 
   const totalPages = isFlipbook ? renderablePages.length || book.pageCount || 0 : 0;
+  const activeRenderablePage =
+    currentPageIndex > 0 && currentPageIndex <= renderablePages.length ? renderablePages[currentPageIndex - 1] ?? null : null;
 
   useEffect(() => {
     const onResize = () => setViewportSize(getViewportSize());
@@ -560,6 +619,14 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
     return { isMobile, pageWidth, pageHeight };
   }, [isPresentation, pageAspectRatio, viewportSize.height, viewportSize.width]);
 
+  const detailLensSize = useMemo(
+    () => (layout.isMobile ? { width: 160, height: 124 } : { width: 240, height: 176 }),
+    [layout.isMobile]
+  );
+
+  const detailLensZoom = layout.isMobile ? 1.7 : 2;
+  const showPresentationDetailLens = isPresentation && !isTouchCapable;
+
   const displayLabel = useMemo(() => {
     if (totalPages <= 0) {
       return "Loading";
@@ -579,15 +646,28 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
         return (
           <PdfCanvasPage
             key={page.id}
+            ref={(node) => {
+              pageRefs.current[page.id] = node;
+            }}
             pdfDoc={page.pdfDoc}
             pageNumber={page.pageNumber}
             pageWidth={layout.pageWidth}
             pageHeight={layout.pageHeight}
+            showPageNumber={!isPresentation}
           />
         );
       }
-      return <PageContentPreview key={page.id} page={page.page} />;
-    });
+      return (
+        <PageContentPreview
+          key={page.id}
+            ref={(node) => {
+              pageRefs.current[page.id] = node;
+            }}
+            page={page.page}
+            showMeta={!isPresentation}
+          />
+        );
+      });
 
     return [
       <CoverPage
@@ -632,6 +712,106 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isFlipbook, onBack, totalPages]);
+
+  useEffect(() => {
+    if (!showPresentationDetailLens || !activeRenderablePage || !stageRef.current) {
+      setActivePageMetrics(null);
+      return;
+    }
+
+    const stageRect = stageRef.current.getBoundingClientRect();
+    const pageElement = pageRefs.current[activeRenderablePage.id];
+    if (!pageElement) {
+      setActivePageMetrics(null);
+      return;
+    }
+
+    const pageRect = pageElement.getBoundingClientRect();
+    if (!pageRect.width || !pageRect.height) {
+      setActivePageMetrics(null);
+      return;
+    }
+
+    setActivePageMetrics({
+      left: pageRect.left - stageRect.left,
+      top: pageRect.top - stageRect.top,
+      width: pageRect.width,
+      height: pageRect.height
+    });
+  }, [
+    activeRenderablePage,
+    currentPageIndex,
+    layout.isMobile,
+    layout.pageHeight,
+    layout.pageWidth,
+    showPresentationDetailLens,
+    viewportSize.height,
+    viewportSize.width
+  ]);
+
+  useEffect(() => {
+    if (!activePageMetrics) {
+      return;
+    }
+
+    setDetailLensPosition((current) => ({
+      x: clamp(current.x, 0, Math.max(0, activePageMetrics.width - detailLensSize.width)),
+      y: clamp(current.y, 0, Math.max(0, activePageMetrics.height - detailLensSize.height))
+    }));
+  }, [activePageMetrics, detailLensSize.height, detailLensSize.width]);
+
+  useEffect(() => {
+    if (!activeRenderablePage) {
+      setIsDetailLensOpen(false);
+    }
+  }, [activeRenderablePage]);
+
+  const beginLensDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!activePageMetrics) {
+      return;
+    }
+
+    const pageLeft = activePageMetrics.left + detailLensPosition.x;
+    const pageTop = activePageMetrics.top + detailLensPosition.y;
+    lensDragStateRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - pageLeft,
+      offsetY: event.clientY - pageTop
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleLensDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!activePageMetrics || !lensDragStateRef.current) {
+      return;
+    }
+
+    const stageRect = stageRef.current?.getBoundingClientRect();
+    if (!stageRect) {
+      return;
+    }
+
+    const nextX = event.clientX - stageRect.left - activePageMetrics.left - lensDragStateRef.current.offsetX;
+    const nextY = event.clientY - stageRect.top - activePageMetrics.top - lensDragStateRef.current.offsetY;
+
+    setDetailLensPosition({
+      x: clamp(nextX, 0, Math.max(0, activePageMetrics.width - detailLensSize.width)),
+      y: clamp(nextY, 0, Math.max(0, activePageMetrics.height - detailLensSize.height))
+    });
+  };
+
+  const endLensDrag = (event?: React.PointerEvent<HTMLDivElement>) => {
+    const dragState = lensDragStateRef.current;
+    if (event && dragState && event.pointerId === dragState.pointerId) {
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture can already be released if the browser ended the drag first.
+      }
+    }
+
+    lensDragStateRef.current = null;
+  };
 
   return (
     <section className={`viewer-shell ${isPresentation ? "presentation-viewer" : ""}`}>
@@ -682,7 +862,40 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
 
       {!editor && isFlipbook && !loading && !error && renderablePages.length > 0 ? (
         <div className="flipbook-shell">
-          <div className="flipbook-stage">
+          <div
+            ref={stageRef}
+            className={`flipbook-stage ${isPresentation && isDetailLensOpen ? "detail-lens-active" : ""}`}
+            onPointerMove={handleLensDrag}
+            onPointerUp={endLensDrag}
+            onPointerLeave={endLensDrag}
+          >
+            {showPresentationDetailLens ? (
+              <div className="presentation-stage-actions">
+                {activeRenderablePage && activePageMetrics ? (
+                  <button
+                    type="button"
+                    className={`presentation-detail-toggle ${isDetailLensOpen ? "active" : ""}`}
+                    onClick={() => setIsDetailLensOpen((current) => !current)}
+                    aria-pressed={isDetailLensOpen}
+                    aria-label={isDetailLensOpen ? "Close zoom box" : "Open zoom box"}
+                    title={isDetailLensOpen ? "Close zoom box" : "Open zoom box"}
+                  >
+                    {isDetailLensOpen ? <X size={18} /> : <Plus size={18} />}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="presentation-detail-toggle is-idle"
+                    aria-label="Zoom box unavailable on cover"
+                    title="Open a page to use the zoom box"
+                    disabled
+                  >
+                    <Plus size={18} />
+                  </button>
+                )}
+              </div>
+            ) : null}
+
             <PageFlipBook
               ref={bookRef as never}
               className="flipbook-root"
@@ -705,10 +918,53 @@ export function FlipbookViewer({ book, onBack, onLoaded, variant = "dashboard", 
             >
               {flipbookChildren}
             </PageFlipBook>
+
+            {showPresentationDetailLens && isDetailLensOpen && activeRenderablePage && activePageMetrics ? (
+              <div
+                className="presentation-detail-lens"
+                style={{
+                  width: `${detailLensSize.width}px`,
+                  height: `${detailLensSize.height}px`,
+                  left: `${activePageMetrics.left + detailLensPosition.x}px`,
+                  top: `${activePageMetrics.top + detailLensPosition.y}px`
+                }}
+              >
+                <button
+                  type="button"
+                  className="presentation-detail-lens-handle"
+                  onPointerDown={beginLensDrag}
+                  aria-label="Move detail lens"
+                  title="Move zoom box"
+                >
+                  <span className="presentation-detail-lens-handle-grip" />
+                </button>
+
+                <div className="presentation-detail-lens-viewport">
+                  <div
+                    className="presentation-detail-lens-surface"
+                    style={{
+                      width: `${activePageMetrics.width}px`,
+                      height: `${activePageMetrics.height}px`,
+                      transform: `translate(${-detailLensPosition.x * detailLensZoom}px, ${-detailLensPosition.y * detailLensZoom}px) scale(${detailLensZoom})`
+                    }}
+                  >
+                    <ZoomPagePreview
+                      page={activeRenderablePage}
+                      pageWidth={Math.round(activePageMetrics.width)}
+                      pageHeight={Math.round(activePageMetrics.height)}
+                      showMeta={false}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
           </div>
 
           {isPresentation && currentPageIndex <= 0 ? (
-            <div className="presentation-hint">Click or swipe to open the magazine</div>
+            <div className="presentation-hint">
+              {isTouchCapable ? "Swipe to open the magazine. Pinch to zoom." : "Click or swipe to open the magazine"}
+            </div>
           ) : null}
 
           {!isPresentation ? <div className="flipbook-toolbar">

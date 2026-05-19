@@ -1403,11 +1403,157 @@ button {
   padding: 0;
 }
 
+.presentation-viewer .flipbook-stage {
+  overflow: auto;
+  touch-action: pinch-zoom pan-x pan-y;
+  overscroll-behavior: contain;
+}
+
 .presentation-viewer .flipbook-root {
   filter:
     drop-shadow(0 2px 4px rgba(0, 0, 0, 0.34))
     drop-shadow(0 26px 56px rgba(0, 0, 0, 0.72))
     drop-shadow(0 0 36px rgba(184, 132, 42, 0.14));
+}
+
+.presentation-stage-actions {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 8;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.presentation-detail-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+    rgba(7, 8, 12, 0.72);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 18px 36px rgba(0, 0, 0, 0.3);
+  color: #fef3c7;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.presentation-detail-toggle:hover {
+  transform: translateY(-1px);
+  border-color: rgba(243, 208, 138, 0.42);
+}
+
+.presentation-detail-toggle:disabled,
+.presentation-detail-toggle.is-idle {
+  opacity: 0.48;
+  cursor: default;
+}
+
+.presentation-detail-toggle:disabled:hover,
+.presentation-detail-toggle.is-idle:hover {
+  transform: none;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.presentation-detail-toggle.active {
+  border-color: rgba(243, 208, 138, 0.44);
+  background:
+    linear-gradient(180deg, rgba(214, 170, 92, 0.22), rgba(255, 255, 255, 0.06)),
+    rgba(16, 12, 8, 0.78);
+}
+
+.presentation-detail-lens {
+  position: absolute;
+  z-index: 9;
+  overflow: hidden;
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04)),
+    rgba(7, 8, 12, 0.7);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 22px 54px rgba(0, 0, 0, 0.36);
+}
+
+.presentation-detail-lens::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 240, 206, 0.08);
+}
+
+.presentation-detail-lens-handle {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(8, 10, 16, 0.58);
+  color: #fff3d1;
+  padding: 10px 12px;
+  cursor: grab;
+}
+
+.presentation-detail-lens-handle:active {
+  cursor: grabbing;
+}
+
+.presentation-detail-lens-handle-grip {
+  width: 36px;
+  height: 6px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.44), rgba(255, 255, 255, 0.18));
+}
+
+.presentation-detail-lens-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.presentation-detail-lens-surface {
+  position: absolute;
+  inset: 0 auto auto 0;
+  transform-origin: top left;
+  pointer-events: none;
+}
+
+.presentation-detail-lens-surface > .flip-page {
+  width: 100%;
+  height: 100%;
+  box-shadow: none;
+}
+
+.presentation-detail-lens-surface .flip-page-frame {
+  inset: 0;
+}
+
+.presentation-detail-lens-surface .flip-page-number {
+  display: none;
+}
+
+.presentation-viewer .flip-page-number {
+  display: none;
 }
 
 .presentation-missing {
@@ -1767,17 +1913,12 @@ textarea.editor-input {
 
 .canvas-editor-shell {
   position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
   min-height: 820px;
+  overflow: hidden;
   background:
     radial-gradient(circle at 14% 12%, rgba(214, 170, 92, 0.12), transparent 24%),
     radial-gradient(circle at 88% 10%, rgba(114, 187, 255, 0.1), transparent 18%),
     linear-gradient(180deg, rgba(10, 16, 24, 0.98), rgba(6, 10, 16, 0.98));
-}
-
-.canvas-editor-shell.drawer-closed {
-  grid-template-columns: minmax(0, 1fr) 0;
 }
 
 .canvas-editor-stage-shell {
@@ -2049,22 +2190,81 @@ textarea.editor-input {
   border-radius: 10px;
 }
 
-.canvas-editor-drawer {
-  position: relative;
-  width: 380px;
-  max-width: min(42vw, 380px);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+.canvas-editor-edge-toggle {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  z-index: 7;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
   background:
-    linear-gradient(180deg, rgba(18, 20, 26, 0.96), rgba(11, 13, 18, 0.98)),
-    rgba(10, 11, 15, 0.96);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
+    rgba(11, 14, 20, 0.88);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 34px rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition:
+    transform 220ms ease,
+    right 220ms ease,
+    border-color 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.canvas-editor-edge-toggle:hover {
+  border-color: rgba(214, 170, 92, 0.42);
+  background:
+    linear-gradient(180deg, rgba(214, 170, 92, 0.18), rgba(255, 255, 255, 0.05)),
+    rgba(11, 14, 20, 0.92);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 22px 38px rgba(0, 0, 0, 0.3);
+}
+
+.canvas-editor-edge-toggle.open {
+  right: min(34vw, 364px);
+}
+
+.canvas-editor-edge-toggle-label {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.canvas-editor-drawer {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  bottom: 18px;
+  z-index: 6;
+  width: min(34vw, 346px);
+  min-width: 300px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 28px;
+  background:
+    linear-gradient(180deg, rgba(24, 28, 36, 0.8), rgba(10, 13, 18, 0.92)),
+    rgba(10, 11, 15, 0.84);
+  backdrop-filter: blur(24px) saturate(135%);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 26px 54px rgba(0, 0, 0, 0.34);
   overflow: hidden;
-  transition: width 220ms ease, transform 220ms ease, opacity 180ms ease;
+  transition: transform 240ms ease, opacity 180ms ease, box-shadow 180ms ease;
 }
 
 .canvas-editor-drawer.closed {
-  width: 0;
-  transform: translateX(100%);
+  transform: translateX(calc(100% + 26px));
   opacity: 0;
+  pointer-events: none;
 }
 
 .canvas-editor-drawer-scroll {
@@ -2084,15 +2284,26 @@ textarea.editor-input {
   gap: 12px;
 }
 
+.canvas-editor-drawer-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -20px -18px 0;
+  padding: 20px 18px 14px;
+  background: linear-gradient(180deg, rgba(14, 16, 22, 0.96), rgba(14, 16, 22, 0.78) 82%, rgba(14, 16, 22, 0));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
 .drawer-section {
   display: grid;
   gap: 12px;
-  padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
-    rgba(255, 255, 255, 0.025);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025)),
+    rgba(255, 255, 255, 0.03);
 }
 
 .drawer-cover-preview {
@@ -2222,6 +2433,8 @@ textarea.editor-input {
   bottom: 0;
   padding: 14px 18px 18px;
   background: linear-gradient(180deg, rgba(11, 13, 18, 0), rgba(11, 13, 18, 0.98) 34%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .canvas-editor-drawer-footer .cancel-btn,
@@ -2359,7 +2572,7 @@ textarea.editor-input {
   }
 
   .canvas-editor-shell {
-    grid-template-columns: 1fr;
+    min-height: 720px;
   }
 
   .canvas-editor-topbar {
@@ -2373,22 +2586,42 @@ textarea.editor-input {
   }
 
   .canvas-editor-drawer {
-    position: absolute;
-    top: 0;
+    top: 12px;
     right: 0;
-    bottom: 0;
-    width: min(92vw, 380px);
-    max-width: none;
+    bottom: 12px;
+    width: min(88vw, 340px);
+    min-width: 0;
     box-shadow: -18px 0 50px rgba(0, 0, 0, 0.34);
-    z-index: 5;
+    z-index: 6;
+    border-radius: 24px 0 0 24px;
+  }
+
+  .canvas-editor-edge-toggle {
+    right: 10px;
+  }
+
+  .canvas-editor-edge-toggle.open {
+    right: min(88vw, 350px);
   }
 
   .canvas-editor-stage-frame {
     padding-inline: 12px;
+    padding-right: 56px;
   }
 
   .canvas-editor-page,
   .canvas-editor-placeholder {
     min-height: 560px;
+  }
+
+  .presentation-stage-actions {
+    top: 12px;
+    right: 12px;
+  }
+
+  .presentation-detail-toggle {
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
   }
 }
